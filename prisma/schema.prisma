@@ -1,0 +1,72 @@
+// 連結到你的 Database (Supabase)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. 使用者模型 (包含學生驗證邏輯)
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  image             String?  // Google 頭像
+  
+  // 核心功能：學生身份驗證
+  isStudentVerified Boolean  @default(false) // 是否通過 .edu.tw 驗證
+  university        String?  // 例如：國立台灣大學
+  department        String?  // 例如：經濟學系
+
+  books             Book[]     @relation("UserBooks")
+  wishlist          Wishlist[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// 2. 書籍商品模型
+model Book {
+  id            String   @id @default(cuid())
+  isbn          String
+  title         String
+  authors       String[]
+  publisher     String?
+  publishedDate String?
+  description   String?
+  coverUrl      String?
+
+  price         Int      // 只保留售價
+  condition     String
+  
+  // ... (其他欄位保持不變)
+  
+  // --- 核心功能：課程對應 (Course Mapping) ---
+  courseName    String?  // 課程名稱 (例如：個體經濟學)
+  professor     String?  // 教授名稱 (例如：王大明)
+  
+  // --- 核心功能：交易方式 ---
+  tradeMethod   String[] // ["面交", "店到店"]
+  meetupPlace   String?  // 面交地點 (例如：台大總圖)
+
+  // 關聯設定
+  sellerId      String
+  seller        User     @relation("UserBooks", fields: [sellerId], references: [id])
+
+  createdAt     DateTime @default(now())
+  status        String   @default("AVAILABLE") // AVAILABLE (上架中), SOLD (已售出)
+}
+
+// 3. 許願池 (當找不到書時，使用者可以許願)
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  isbn      String   // 使用者想要的書的 ISBN
+  
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, isbn]) // 防止同一個人重複許願同一本書
+}
