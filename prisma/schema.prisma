@@ -1,35 +1,62 @@
-// 連結到你的 Database (Supabase)
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-// 1. 使用者模型 (包含學生驗證邏輯)
+// 1. 使用者 (User)
 model User {
-  id                String   @id @default(cuid())
-  email             String   @unique
-  name              String?
-  image             String?  // Google 頭像
-  
-  // 核心功能：學生身份驗證
-  isStudentVerified Boolean  @default(false) // 是否通過 .edu.tw 驗證
-  university        String?  // 例如：國立台灣大學
-  department        String?  // 例如：經濟學系
-
-  books             Book[]     @relation("UserBooks")
-  wishlist          Wishlist[]
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  university    String?   // 👈 新增這一行：所屬大學
+  accounts      Account[]
+  sessions      Session[]
+  books         Book[]    // 一個人可以賣很多書
+  createdAt     DateTime  @default(now())
+  chatRooms     ChatRoom[] @relation("ChatParticipants")
+  messagesSent  Message[]  @relation("MessageSender")
+  updatedAt     DateTime  @updatedAt
 }
 
-// 2. 書籍商品模型
+// 2. 帳號 (Account) - 用來存 Google 給的登入資料
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// 3. 工作階段 (Session) - 判斷使用者有沒有登入
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// 4. 書籍 (Book)
 model Book {
   id            String   @id @default(cuid())
+  status        String   @default("ON_SALE")
   isbn          String
   title         String
   authors       String[]
@@ -37,36 +64,43 @@ model Book {
   publishedDate String?
   description   String?
   coverUrl      String?
-
-  price         Int      // 只保留售價
+  price         Int
+  originalPrice Int?     // 原價 (設為可選，因為有些老書沒定價)
+  noteStatus    String?  // 筆記狀況 (例如：無劃記、有筆記)
   condition     String
-  
-  // ... (其他欄位保持不變)
-  
-  // --- 核心功能：課程對應 (Course Mapping) ---
-  courseName    String?  // 課程名稱 (例如：個體經濟學)
-  professor     String?  // 教授名稱 (例如：王大明)
-  
-  // --- 核心功能：交易方式 ---
-  tradeMethod   String[] // ["面交", "店到店"]
-  meetupPlace   String?  // 面交地點 (例如：台大總圖)
-
-  // 關聯設定
-  sellerId      String
-  seller        User     @relation("UserBooks", fields: [sellerId], references: [id])
-
+  courseName    String?
+  professor     String?
+  tradeMethod   String[]
   createdAt     DateTime @default(now())
-  status        String   @default("AVAILABLE") // AVAILABLE (上架中), SOLD (已售出)
+  updatedAt     DateTime @updatedAt
+
+  sellerId      String   // 這本書是誰賣的
+  seller        User     @relation(fields: [sellerId], references: [id])
+}
+// 聊天室 (連結兩個使用者)
+model ChatRoom {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt // 用來排序，有新訊息時會更新這個時間
+  
+  // 聊天室裡的成員 (買家 & 賣家)
+  users     User[]    @relation("ChatParticipants")
+  
+  // 聊天室裡的所有訊息
+  messages  Message[]
 }
 
-// 3. 許願池 (當找不到書時，使用者可以許願)
-model Wishlist {
-  id        String   @id @default(cuid())
-  userId    String
-  isbn      String   // 使用者想要的書的 ISBN
+// 訊息 (每一句話)
+model Message {
+  id         String   @id @default(cuid())
+  content    String   // 訊息內容
+  createdAt  DateTime @default(now())
   
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-
-  @@unique([userId, isbn]) // 防止同一個人重複許願同一本書
+  // 誰傳的？
+  senderId   String
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+  
+  // 屬於哪個聊天室？
+  chatRoomId String
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
 }

@@ -1,90 +1,110 @@
-import Link from 'next/link';
-import { prisma } from '@/lib/prisma';
-import BookCard from '@/components/BookCard';
+import { prisma } from "@/lib/prisma";
+import Link from "next/link";
+import SearchBar from "@/components/SearchBar"; // 引入剛剛做的搜尋框 (給手機版用)
 
-// 1. 定義參數類型 (Next.js 15 規定這裡必須是 Promise)
-interface SearchPageProps {
-  searchParams: Promise<{
-    q?: string;
-  }>;
+interface Props {
+  searchParams: Promise<{ q?: string }>;
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
-  // 2. ✨ 關鍵修改：先 await 等待參數解析完成
-  const resolvedParams = await searchParams;
-  const query = resolvedParams.q || '';
+export default async function SearchPage({ searchParams }: Props) {
+  const { q } = await searchParams;
+  const query = q || "";
 
-  // 3. 去資料庫撈資料
+  // 如果沒有搜尋字，給空陣列；有搜尋字才去資料庫找
   const books = query
     ? await prisma.book.findMany({
         where: {
+          status: "ON_SALE", // 只找架上的
           OR: [
-            { title: { contains: query, mode: 'insensitive' } },
-            { courseName: { contains: query, mode: 'insensitive' } },
-            { professor: { contains: query, mode: 'insensitive' } },
+            { title: { contains: query} },       // 找書名
+            { description: { contains: query } }, // 找描述
+            { authors: { has: query } },          // 找作者 (陣列比對)
+            { courseName: { contains: query } },  // 找課程
+            { professor: { contains: query } },   // 找教授
+            { isbn: { contains: query } },        // 找 ISBN
           ],
         },
-        orderBy: { createdAt: 'desc' },
+        include: {
+          seller: { select: { name: true, image: true } },
+        },
       })
     : [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 頂部搜尋列 */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4 max-w-3xl mx-auto">
-            <Link href="/" className="text-2xl font-bold text-blue-600 hidden md:block">
-              CampusBooks
-            </Link>
-            
-            <form action="/search" className="flex-1 flex gap-2">
-              <input
-                name="q"
-                defaultValue={query}
-                type="text"
-                placeholder="輸入書名、課程名稱或教授姓名..."
-                className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-              />
-              <button 
-                type="submit"
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition"
-              >
-                搜尋
-              </button>
-            </form>
-          </div>
+    <main className="min-h-screen bg-gray-50 py-12">
+      <div className="container mx-auto px-4 max-w-6xl">
+        
+        {/* 標題區 */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            🔍 搜尋結果：<span className="text-blue-600">{query || "全部"}</span>
+          </h1>
+          <p className="text-gray-500">找到 {books.length} 筆相關書籍</p>
         </div>
-      </div>
 
-      {/* 搜尋結果區 */}
-      <div className="container mx-auto px-4 py-8">
-        {!query ? (
-          <div className="text-center py-20 text-gray-500">
-            <p className="text-xl mb-2">👋 嗨！你想找什麼書？</p>
-            <p className="text-sm">試試看搜尋「經濟學」或是教授的名字</p>
-          </div>
-        ) : books.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-xl text-gray-800 mb-2">找不到關於「<span className="text-red-500 font-bold">{query}</span>」的書籍</p>
-            <p className="text-gray-500 mb-6">這本書可能還沒人上架，或是關鍵字打錯囉？</p>
-            <Link href="/sell" className="inline-block bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
-              我有這本書，我要賣！
+        {/* 手機版搜尋框 (電腦版在導覽列，手機版這裡也放一個方便搜) */}
+        <div className="md:hidden mb-8">
+            <SearchBar />
+        </div>
+
+        {/* 搜尋結果列表 */}
+        {books.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
+            <p className="text-6xl mb-4">🤔</p>
+            <h3 className="text-xl font-bold text-gray-800">找不到相關書籍</h3>
+            <p className="text-gray-500 mt-2">試試看別的關鍵字，例如「經濟」、「微積分」</p>
+            <Link href="/" className="inline-block mt-6 text-blue-600 font-bold hover:underline">
+              回首頁瀏覽全部
             </Link>
           </div>
         ) : (
-          <div>
-             <p className="mb-6 text-gray-600">
-               找到 {books.length} 筆關於「<span className="font-bold text-black">{query}</span>」的結果：
-             </p>
-             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-               {books.map((book) => (
-                 <BookCard key={book.id} book={book} />
-               ))}
-             </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {books.map((book) => (
+              <Link
+                key={book.id}
+                href={`/books/${book.id}`}
+                className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col"
+              >
+                <div className="aspect-[3/4] bg-gray-100 relative overflow-hidden">
+                  {book.coverUrl ? (
+                    <img
+                      src={book.coverUrl}
+                      alt={book.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold bg-slate-50">NO COVER</div>
+                  )}
+                  <div className="absolute top-2 left-2">
+                    <span className="bg-black/60 backdrop-blur-md text-white text-xs font-bold px-2 py-1 rounded-md border border-white/20">
+                      {book.condition}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 flex flex-col flex-1">
+                  <h3 className="font-bold text-gray-900 line-clamp-1 mb-1 group-hover:text-blue-600 transition">
+                    {book.title}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-3 truncate">
+                    {book.authors.join(", ")}
+                  </p>
+                  
+                  <div className="mt-auto flex items-center justify-between">
+                    <span className="text-lg font-black text-blue-600">
+                      NT$ {book.price}
+                    </span>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <img src={book.seller.image || "/default-avatar.png"} className="w-5 h-5 rounded-full border border-gray-200" />
+                      <span className="truncate max-w-[60px]">{book.seller.name}</span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
