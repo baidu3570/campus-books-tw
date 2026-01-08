@@ -95,7 +95,7 @@ export default function BookUploadForm() {
     } finally {
       setUploadingImg(false);
     }
-  };
+  }; //chore: trigger deploy
   // 自動帶入 ISBN 資料
   const handleAutoFill = async () => {
     if (!formData.isbn) return;
@@ -112,7 +112,9 @@ export default function BookUploadForm() {
         publisher: data.publisher || "",
         publishedDate: data.publishedDate || "",
         description: data.description || "",
-        coverUrl: data.imageLinks?.thumbnail || "",
+        coverUrl: data.thumbnail || "",
+        // 把 http 換成 https，確保圖片一定能顯示
+        coverUrl: data.thumbnail?.replace("http:", "https:") || "",
       }));
       setMsg("✅ 自動帶入成功！");
     } catch (error) {
