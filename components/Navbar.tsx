@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useState, Suspense } from "react"; // 👈 1. 這裡引入了 Suspense
+import { useState, Suspense } from "react";
 import SearchBar from "./SearchBar";
 
 export default function Navbar() {
@@ -22,9 +22,8 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* 🔍 中間搜尋框 (重點修改區) */}
+          {/* 🔍 中間搜尋框 */}
           <div className="hidden md:block flex-1 max-w-md mx-4">
-            {/* 👇 2. 這裡用 Suspense 把 SearchBar 包起來，解決 Vercel 報錯問題 */}
             <Suspense fallback={<div className="w-full h-10 bg-gray-100 rounded-xl animate-pulse" />}>
               <SearchBar />
             </Suspense>
@@ -41,18 +40,23 @@ export default function Navbar() {
             
             {session ? (
               <div className="flex items-center gap-4">
-                <Link href="/chat" className="relative p-2 text-gray-500 hover:text-blue-600 transition hover:bg-blue-50 rounded-full">
+                <Link href="/chat" className="relative p-2 text-gray-500 hover:text-blue-600 transition hover:bg-blue-50 rounded-full" title="我的訊息">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                 </Link>
                 
+                {/* 👇 修改重點：把頭像和名字包在 Link 裡 */}
                 <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-                  <img 
-                    src={session.user?.image || "https://ui-avatars.com/api/?name=User"} 
-                    alt="User" 
-                    className="w-8 h-8 rounded-full border border-gray-200"
-                  />
+                  <Link href="/profile" className="flex-shrink-0 group" title="前往賣家中心">
+                    <img 
+                      src={session.user?.image || "https://ui-avatars.com/api/?name=User"} 
+                      alt="User" 
+                      className="w-8 h-8 rounded-full border border-gray-200 group-hover:ring-2 group-hover:ring-blue-500 transition"
+                    />
+                  </Link>
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-700">{session.user?.name}</span>
+                    <Link href="/profile" className="text-sm font-bold text-gray-700 hover:text-blue-600 transition">
+                      {session.user?.name}
+                    </Link>
                     <button 
                       onClick={() => signOut()}
                       className="text-xs text-red-500 hover:text-red-700 text-left font-medium"
@@ -86,7 +90,6 @@ export default function Navbar() {
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-gray-100 bg-white p-4 space-y-4 shadow-xl">
           <div className="mb-4">
-             {/* 手機版搜尋框也要包 Suspense */}
             <Suspense fallback={<div className="w-full h-10 bg-gray-100 rounded-xl animate-pulse" />}>
               <SearchBar />
             </Suspense>
@@ -98,12 +101,16 @@ export default function Navbar() {
 
           {session ? (
             <div className="space-y-3">
-               <Link href="/chat" className="block w-full text-center py-3 font-bold text-blue-600 bg-blue-50 rounded-xl">
+              <Link href="/chat" className="block w-full text-center py-3 font-bold text-blue-600 bg-blue-50 rounded-xl">
                 💬 我的訊息
               </Link>
+              
+              {/* 👇 手機版也加上連結 */}
               <div className="flex items-center justify-center gap-3 pt-3 border-t">
-                <img src={session.user?.image || ""} className="w-8 h-8 rounded-full" />
-                <span className="font-bold">{session.user?.name}</span>
+                <Link href="/profile" className="flex items-center gap-3 group">
+                  <img src={session.user?.image || ""} className="w-8 h-8 rounded-full border border-gray-200" />
+                  <span className="font-bold text-gray-800 group-hover:text-blue-600">{session.user?.name}</span>
+                </Link>
                 <button onClick={() => signOut()} className="text-red-500 text-sm font-bold bg-red-50 px-3 py-1 rounded-lg">登出</button>
               </div>
             </div>

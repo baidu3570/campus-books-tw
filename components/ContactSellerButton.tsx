@@ -23,7 +23,8 @@ export default function ContactSellerButton({ sellerId, bookTitle }: Props) {
       return;
     }
 
-    // 2. 不能跟自己聊
+    // 2. 不能跟自己聊 (前端先擋一次，後端也會擋)
+    // 注意：session.user 預設沒 id，這裡可能會是 undefined，但不影響流程
     if ((session.user as any).id === sellerId) {
       alert("這是你自己的書啦！不用跟自己聊天 😂");
       return;
@@ -32,15 +33,15 @@ export default function ContactSellerButton({ sellerId, bookTitle }: Props) {
     setIsLoading(true);
 
     try {
-      // 👇 3. 準備好「預設訊息」
+      // 3. 準備好「預設訊息」
       const firstMessage = `你好，我想詢問關於《${bookTitle}》這本書，請問還有貨嗎？`;
 
-      // 4. 呼叫後端 API
-      const res = await fetch("/api/chat/start", {
+      // 4. 呼叫後端 API (路徑改成 /api/chat)
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          targetUserId: sellerId,
+          sellerId: sellerId,  // 👈 統一參數名稱
           message: firstMessage // 👈 把這句話傳給後端
         }),
       });

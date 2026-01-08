@@ -1,167 +1,128 @@
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import ContactSellerButton from "@/components/ContactSellerButton";
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
-
-export default async function BookDetailsPage({ params }: Props) {
-  const { id } = await params;
+export default async function BookDetailsPage(
+  props: { params: Promise<{ id: string }> }
+) {
+  const params = await props.params;
 
   const book = await prisma.book.findUnique({
-    where: { id },
+    where: { id: params.id },
     include: {
       seller: {
-        select: { name: true, image: true, email: true },
-      },
-    },
+        select: { id: true, name: true, image: true, university: true }
+      }
+    }
   });
 
-  if (!book) {
-    notFound();
-  }
+  if (!book) return notFound();
 
-  // 判斷是否已售出
-  const isSold = book.status === "SOLD";
+  // 計算折數 (如果有原價的話)
+  const discount = book.originalPrice 
+    ? Math.round((book.price / book.originalPrice) * 100) / 10 
+    : null;
 
   return (
-    <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      
-      {/* 🎨 背景裝飾 */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute top-[10%] right-[-10%] w-[500px] h-[500px] bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-[-20%] left-[20%] w-[500px] h-[500px] bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
-      </div>
-
-      <div className="container mx-auto px-4 py-12 max-w-5xl relative z-10">
-        <div className="mb-8 flex items-center gap-2 text-sm text-gray-500 font-medium">
-          <Link href="/" className="hover:text-indigo-600 transition flex items-center gap-1">
-            <span>🏠</span> 首頁
-          </Link>
-          <span className="text-gray-300">/</span>
-          <span className="text-gray-800">書籍詳情</span>
-        </div>
-
-        <div className="bg-white/80 backdrop-blur-xl shadow-2xl rounded-3xl overflow-hidden border border-white/50">
-          <div className="md:flex">
+    <main className="min-h-screen bg-gray-50 py-12">
+      <div className="container mx-auto px-4 max-w-5xl">
+        <div className="bg-white rounded-3xl shadow-xl overflow-hidden grid md:grid-cols-2">
+          
+          {/* 左邊：圖片區 */}
+          <div className="bg-gray-100 p-8 flex items-center justify-center min-h-[400px] relative">
+            {book.coverUrl ? (
+              <img src={book.coverUrl} alt={book.title} className="w-64 h-auto shadow-2xl rounded-lg transform hover:scale-105 transition duration-500" />
+            ) : (
+              <div className="text-gray-400 font-bold text-xl">無封面圖片</div>
+            )}
             
-            {/* 左側：圖片區 */}
-            <div className="md:w-2/5 p-8 bg-gradient-to-b from-gray-50/50 to-gray-100/50 flex items-center justify-center relative">
-              <div className="relative group perspective-1000 w-full max-w-[280px]">
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-violet-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                
-                {/* 圖片容器 */}
-                <div className="relative shadow-2xl rounded-lg overflow-hidden aspect-[3/4] bg-white transform transition-transform duration-500 group-hover:scale-[1.02]">
-                  {book.coverUrl ? (
-                    <img 
-                      src={book.coverUrl} 
-                      alt={book.title} 
-                      className={`w-full h-full object-cover transition ${isSold ? "grayscale opacity-80" : ""}`} 
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-400">
-                      <span className="text-6xl mb-4 opacity-50">📖</span>
-                      <span className="font-medium tracking-widest uppercase text-xs">No Cover</span>
-                    </div>
-                  )}
+            {/* 顯示折數標籤 */}
+            {discount && (
+               <div className="absolute top-6 left-6 bg-red-500 text-white font-black px-3 py-1 rounded-full shadow-lg transform -rotate-12">
+                 {discount} 折
+               </div>
+            )}
+          </div>
 
-                  {/* 已售出遮罩 (圖片上) */}
-                  {isSold && (
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
-                      <div className="border-4 border-white px-6 py-2 transform -rotate-12 bg-black/50 backdrop-blur-sm">
-                        <span className="text-white text-3xl font-black tracking-widest uppercase">SOLD OUT</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 右側：資訊區 */}
-            <div className="p-8 md:p-10 md:w-3/5 flex flex-col justify-between">
-              <div>
-                <div className="flex flex-col-reverse md:flex-row md:justify-between md:items-start gap-4 mb-2">
-                  <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 leading-tight tracking-tight">
-                    {book.title}
-                  </h1>
-                  
-                  {/* 書況標籤 */}
-                  <span className={`self-start px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border ${
-                    book.condition === '全新' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                    book.condition === '近全新' ? 'bg-sky-100 text-sky-700 border-sky-200' :
-                    'bg-amber-100 text-amber-700 border-amber-200'
-                  }`}>{book.condition}</span>
-                </div>
-                
-                <p className="text-lg text-slate-500 mb-8 font-medium flex items-center gap-2">
-                  <span className="w-8 h-[1px] bg-slate-300 inline-block"></span>
-                  {book.authors.join(", ")}
-                </p>
-                
-                {/* 價格與折數區 */}
-                <div className="mb-8 inline-block">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm text-gray-500 font-bold">NT$</span>
-                    <span className={`text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r ${isSold ? "from-gray-400 to-gray-600" : "from-blue-600 to-violet-600"}`}>
-                      {book.price}
-                    </span>
-                    
-                    {/* 顯示原價與折數 */}
-                    {book.originalPrice && (
-                      <div className="flex flex-col ml-2">
-                        <span className="text-sm text-gray-400 line-through decoration-gray-300">原價 ${book.originalPrice}</span>
-                        <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
-                           {Math.round((book.price / book.originalPrice) * 100) / 10} 折
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 詳細資訊 Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm text-slate-600 mb-8 bg-slate-50/80 p-6 rounded-2xl border border-slate-100">
-                  <div className="space-y-1"><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">課程名稱</p><p className="font-semibold text-slate-800">{book.courseName || "—"}</p></div>
-                  <div className="space-y-1"><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">授課教授</p><p className="font-semibold text-slate-800">{book.professor || "—"}</p></div>
-                  <div className="space-y-1"><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">出版社</p><p className="font-semibold text-slate-800 truncate">{book.publisher || "—"}</p></div>
-                  <div className="space-y-1"><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">ISBN</p><p className="font-mono font-semibold text-slate-800">{book.isbn}</p></div>
-                  
-                  {/* 筆記狀況 */}
-                  <div className="space-y-1 md:col-span-2 border-t border-slate-200 pt-3 mt-1">
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">筆記狀況</p>
-                    <p className="font-semibold text-slate-800">{book.noteStatus || "賣家未說明"}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 底部按鈕區 */}
-              <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                
-                {/* 賣家資訊 */}
-                <div className="flex items-center gap-4 group cursor-default">
-                   <div className="relative">
-                      <img src={book.seller.image || "/default-avatar.png"} alt="賣家" className="w-14 h-14 rounded-full border-4 border-white shadow-md object-cover" referrerPolicy="no-referrer" />
-                      <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-400 border-2 border-white rounded-full"></div>
-                   </div>
-                   <div>
-                     <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Seller</p>
-                     <p className="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition">{book.seller.name || "匿名賣家"}</p>
-                   </div>
-                </div>
-
-                {/* 根據狀態顯示不同按鈕 */}
-                {isSold ? (
-                  <button disabled className="flex-1 md:flex-none bg-gray-100 text-gray-400 px-8 py-4 rounded-xl font-bold cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200">
-                    🔒 此商品已售出
-                  </button>
-                ) : (
-                  <ContactSellerButton sellerId={book.sellerId} bookTitle={book.title} />
+          {/* 右邊：資訊區 */}
+          <div className="p-8 md:p-12 flex flex-col">
+            <div className="flex-1">
+              {/* 課程與教授標籤 */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {book.courseName && (
+                  <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full">
+                    📘 {book.courseName}
+                  </span>
                 )}
+                {book.professor && (
+                  <span className="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full">
+                    👨‍🏫 {book.professor}
+                  </span>
+                )}
+              </div>
+              
+              <h1 className="text-3xl font-black text-gray-900 mb-2 leading-tight">{book.title}</h1>
+              
+              {/* 👇👇👇 這裡修復了 author 的錯誤 👇👇👇 */}
+              <p className="text-lg text-gray-500 mb-6 font-medium">
+                作者：{book.author}
+              </p>
 
+              <div className="space-y-6 mb-8">
+                {/* 價格區塊 */}
+                <div className="flex items-end gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                  <div>
+                    <p className="text-xs text-gray-400 font-bold uppercase mb-1">目前售價</p>
+                    <span className="text-4xl font-black text-blue-600">${book.price}</span>
+                  </div>
+                  {book.originalPrice && (
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-400 font-bold uppercase mb-0">原價</p>
+                      <span className="text-lg text-gray-400 line-through decoration-2">${book.originalPrice}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* 書況細節網格 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p className="text-xs text-gray-400 font-bold uppercase mb-1">書況</p>
+                    <p className="font-bold text-gray-800">{book.condition}</p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p className="text-xs text-gray-400 font-bold uppercase mb-1">內頁劃記</p>
+                    <p className="font-bold text-gray-800">{book.noteStatus || "未標示"}</p>
+                  </div>
+                </div>
+
+                {/* 詳細備註 */}
+                <div className="p-5 bg-yellow-50 rounded-2xl border border-yellow-100">
+                   <p className="text-xs text-yellow-600 font-bold uppercase mb-2 flex items-center gap-1">
+                     📝 賣家備註
+                   </p>
+                   <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+                     {book.description || "賣家沒有留下詳細介紹，建議私訊詢問書況細節。"}
+                   </p>
+                </div>
               </div>
             </div>
+
+            {/* 底部按鈕區 */}
+            <div className="mt-6 border-t pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <img src={book.seller.image || "https://ui-avatars.com/api/?name=User"} className="w-10 h-10 rounded-full border border-gray-200" />
+                <div>
+                  <p className="text-sm font-bold text-gray-900">賣家：{book.seller.name}</p>
+                  <p className="text-xs text-gray-500">{book.seller.university || "未提供學校"}</p>
+                </div>
+              </div>
+
+              <ContactSellerButton 
+                sellerId={book.seller.id} 
+                bookTitle={book.title}
+              />
+            </div>
+
           </div>
         </div>
       </div>

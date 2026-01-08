@@ -1,53 +1,63 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-// 👇 請確認這個路徑是否正確指向你的 auth 設定檔
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export async function POST(request: Request) {
   try {
-    // 1. 檢查登入
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "請先登入才能賣書" }, { status: 401 });
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    // 2. 取得資料
     const body = await request.json();
+    
+    // 👇👇👇 關鍵修正：這裡一定要把 isbn 拿出來！ 👇👇👇
     const { 
-      isbn, title, authors, publisher, publishedDate, 
-      description, coverUrl, price, condition, 
-      courseName, professor,
-      originalPrice, noteStatus // 👈 新增這兩個欄位
+      isbn,  // 👈 補上這個，下面的紅色波浪線就會消失了
+      title, author, price, condition, 
+      courseName, coverUrl, description,
+      originalPrice, noteStatus, professor 
     } = body;
 
-    // 3. 寫入資料庫
+    // 必填檢查
+    if (!title || !price || !condition) {
+      return NextResponse.json({ error: "缺少必填欄位" }, { status: 400 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "找不到使用者" }, { status: 404 });
+    }
+
+    // 2. 寫入資料庫
     const newBook = await prisma.book.create({
       data: {
-        isbn,
+        isbn: isbn || "N/A", // 這裡現在讀得到上面的 isbn 變數了
         title,
-        // 強制轉成陣列，避免前端傳來字串導致錯誤
-        authors: Array.isArray(authors) ? authors : [authors],
-        publisher,
-        publishedDate,
-        description,
-        coverUrl: coverUrl || "", // 如果沒圖片就給空字串
+        // 相容性處理：不管前端傳陣列還是字串都能存
+        author: Array.isArray(author) ? author.join(", ") : (author || "未知作者"),
         price: Number(price),
         condition,
-        courseName,
-        professor,
-        sellerId: (session.user as any).id, // 連結到賣家
+        courseName: courseName || null,
+        coverUrl: coverUrl || null,
+        description: description || "",
+        status: "ON_SALE",
+        sellerId: user.id,
 
-        // 👇 處理新欄位：轉數字或給預設值
+        // 新欄位
         originalPrice: originalPrice ? Number(originalPrice) : null,
-        noteStatus: noteStatus || "賣家未說明",
+        noteStatus: noteStatus || null,
+        professor: professor || null,
       },
     });
 
     return NextResponse.json(newBook);
-    
   } catch (error) {
     console.error("上架失敗:", error);
-    return NextResponse.json({ error: "上架失敗，請稍後再試" }, { status: 500 });
+    return NextResponse.json({ error: "上架失敗，資料庫欄位錯誤" }, { status: 500 });
   }
 }

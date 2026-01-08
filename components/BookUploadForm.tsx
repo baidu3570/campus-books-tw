@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 // ==========================================
-// 👇 已經幫你填好你的 Cloudinary 資料了！
+// 👇 Cloudinary 設定
 // ==========================================
 const CLOUDINARY_CLOUD_NAME = "dltyducdd"; 
 const CLOUDINARY_UPLOAD_PRESET = "upload_safe";
@@ -31,7 +31,7 @@ export default function BookUploadForm() {
   const router = useRouter();
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
-  const [uploadingImg, setUploadingImg] = useState(false); // 圖片上傳狀態
+  const [uploadingImg, setUploadingImg] = useState(false);
   const [msg, setMsg] = useState("");
 
   const [formData, setFormData] = useState<FormData>({
@@ -43,14 +43,14 @@ export default function BookUploadForm() {
     description: "",
     coverUrl: "",
     price: "",
-    condition: "九成新",
+    condition: "九成新", // 預設值
     courseName: "",
     professor: "",
     originalPrice: "",
     noteStatus: "",
   });
 
-  // 處理圖片上傳 (傳送到 Cloudinary)
+  // 處理圖片上傳
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -63,21 +63,14 @@ export default function BookUploadForm() {
     formDataObj.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
     try {
-      console.log("正在上傳到:", `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`);
-      
       const res = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-        {
-          method: "POST",
-          body: formDataObj,
-        }
+        { method: "POST", body: formDataObj }
       );
 
       const data = await res.json();
       
-      // 👇 這裡會把真正的錯誤原因抓出來顯示！
       if (data.error) {
-        alert(`❌ Cloudinary 錯誤: ${data.error.message}`);
         setMsg(`❌ 上傳失敗: ${data.error.message}`);
         return;
       }
@@ -85,23 +78,19 @@ export default function BookUploadForm() {
       if (data.secure_url) {
         setFormData((prev) => ({ ...prev, coverUrl: data.secure_url }));
         setMsg("✅ 圖片上傳成功！");
-      } else {
-        throw new Error("未預期的回應格式");
       }
     } catch (error: any) {
-      console.error("圖片上傳錯誤:", error);
-      alert(`❌ 發生錯誤: ${error.message}`);
-      setMsg("❌ 圖片上傳失敗，請檢查網路或設定");
+      setMsg("❌ 圖片上傳失敗，請檢查網路");
     } finally {
       setUploadingImg(false);
     }
-  }; //chore: trigger deploy
+  };
+
   // 自動帶入 ISBN 資料
   const handleAutoFill = async () => {
     if (!formData.isbn) return;
     setLoading(true);
     try {
-      // ✅ 改成這樣 (把 books/lookup 換成 check)
       const res = await fetch(`/api/check?isbn=${formData.isbn}`);
       if (!res.ok) throw new Error("找不到這本書");
       const data = await res.json();
@@ -111,9 +100,8 @@ export default function BookUploadForm() {
         authors: data.authors || [],
         publisher: data.publisher || "",
         publishedDate: data.publishedDate || "",
-        description: data.description || "",
-        coverUrl: data.thumbnail || "",
-        // 把 http 換成 https，確保圖片一定能顯示
+        description: data.description || prev.description, // 如果 API 有簡介就帶入，沒有就保留原本的
+        coverUrl: data.thumbnail || prev.coverUrl,
       }));
       setMsg("✅ 自動帶入成功！");
     } catch (error) {
@@ -158,7 +146,7 @@ export default function BookUploadForm() {
     <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 max-w-2xl mx-auto">
       <h2 className="text-3xl font-black text-center mb-8 text-gray-800">上架你的二手書</h2>
       
-      {/* ISBN 自動帶入區塊 */}
+      {/* 1. ISBN */}
       <div className="mb-8">
         <label className="block text-sm font-bold text-gray-700 mb-2">1. 快速輸入 (ISBN)</label>
         <div className="flex gap-2">
@@ -167,7 +155,7 @@ export default function BookUploadForm() {
             value={formData.isbn}
             onChange={(e) => setFormData({ ...formData, isbn: e.target.value })}
             placeholder="輸入 ISBN 自動帶入資料..."
-            className="flex-1 p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition outline-none font-mono"
+            className="flex-1 p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 transition outline-none font-mono"
           />
           <button
             type="button"
@@ -178,16 +166,15 @@ export default function BookUploadForm() {
             自動帶入
           </button>
         </div>
-        {msg && <p className={`text-sm mt-2 font-medium animate-pulse ${msg.includes('❌') ? 'text-red-500' : 'text-green-600'}`}>{msg}</p>}
+        {msg && <p className={`text-sm mt-2 font-medium ${msg.includes('❌') ? 'text-red-500' : 'text-green-600'}`}>{msg}</p>}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* 圖片上傳區塊 (Cloudinary) */}
+        {/* 2. 圖片 */}
         <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
           <label className="block text-sm font-bold text-gray-700 mb-2">2. 書況照片 (封面)</label>
           <div className="flex items-start gap-4">
-            {/* 預覽圖 */}
             <div className="w-24 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0 border border-gray-300 relative">
               {formData.coverUrl ? (
                 <img src={formData.coverUrl} alt="Cover" className="w-full h-full object-cover" />
@@ -198,13 +185,9 @@ export default function BookUploadForm() {
                 </div>
               )}
               {uploadingImg && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-bold">
-                  上傳中...
-                </div>
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-bold">上傳中...</div>
               )}
             </div>
-
-            {/* 上傳按鈕 */}
             <div className="flex-1">
               <input
                 type="file"
@@ -213,15 +196,12 @@ export default function BookUploadForm() {
                 disabled={uploadingImg}
                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-2 cursor-pointer"
               />
-              <p className="text-xs text-gray-500">
-                💡 點擊上方按鈕上傳實拍照片。<br/>
-                (如果自動帶入已有圖片，你上傳後會覆蓋掉原本的圖片)
-              </p>
+              <p className="text-xs text-gray-500">建議上傳實拍照片以增加信任度。</p>
             </div>
           </div>
         </div>
 
-        {/* 基本資料區 */}
+        {/* 3. 詳細資料 */}
         <div className="space-y-4">
           <label className="block text-sm font-bold text-gray-700">3. 詳細資料</label>
           <div>
@@ -250,7 +230,7 @@ export default function BookUploadForm() {
 
         <hr className="border-gray-100" />
 
-        {/* 售價與書況 */}
+        {/* 4. 價格與書況 */}
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -263,23 +243,19 @@ export default function BookUploadForm() {
             </div>
           </div>
 
-          {/* 自動計算折數提示 */}
-          {formData.price && formData.originalPrice && (
-            <div className="text-right text-sm font-bold text-green-600 bg-green-50 p-2 rounded-lg inline-block float-right">
-              💡 這樣約等於 {Math.round((Number(formData.price) / Number(formData.originalPrice)) * 100) / 10} 折
-            </div>
-          )}
-          <div className="clear-both"></div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">書況</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">書況 (新舊程度)</label>
               <select value={formData.condition} onChange={(e) => setFormData({ ...formData, condition: e.target.value })} className="w-full p-3 border border-gray-200 rounded-xl bg-white">
-                <option value="全新">✨ 全新</option>
+                {/* 👇 這裡幫你增加了很多選項 */}
+                <option value="全新">✨ 全新 (未拆封/未使用)</option>
                 <option value="近全新">🌟 近全新 (翻過幾次)</option>
                 <option value="九成新">📖 九成新 (無明顯摺痕)</option>
                 <option value="八成新">📚 八成新 (有使用痕跡)</option>
                 <option value="七成新">📦 七成新 (保存良好)</option>
+                <option value="六成新">📉 六成新 (有明顯折舊)</option>
+                <option value="五成新">🛠️ 五成新 (功能正常但舊)</option>
+                <option value="有破損">💔 有破損/缺頁 (請在備註說明)</option>
               </select>
             </div>
 
@@ -291,9 +267,22 @@ export default function BookUploadForm() {
                 <option value="無劃記">📄 完全無劃記</option>
                 <option value="少許劃記">✏️ 少許鉛筆/螢光筆</option>
                 <option value="筆記豐富">📝 筆記豐富 (考前救星)</option>
+                <option value="有塗鴉/髒污">🖍️ 有塗鴉/髒污</option>
               </select>
             </div>
           </div>
+        </div>
+
+        {/* 👇 5. 新增：備註欄位 */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">5. 備註 / 詳細說明</label>
+          <textarea 
+            rows={4}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="請詳細描述書況，例如：&#10;- 封面有小折痕&#10;- 附贈習題解答光碟&#10;- 哪裡方便面交..."
+            className="w-full p-3 border border-gray-200 rounded-xl focus:border-blue-500 outline-none transition resize-none"
+          />
         </div>
 
         <button

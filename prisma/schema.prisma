@@ -14,17 +14,21 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  university    String?   // 👈 新增這一行：所屬大學
+  university    String?   // 所屬大學
+  
   accounts      Account[]
   sessions      Session[]
-  books         Book[]    // 一個人可以賣很多書
-  createdAt     DateTime  @default(now())
+  books         Book[]    // 賣家的書
+  
+  // 聊天相關
   chatRooms     ChatRoom[] @relation("ChatParticipants")
   messagesSent  Message[]  @relation("MessageSender")
+  
+  createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
 
-// 2. 帳號 (Account) - 用來存 Google 給的登入資料
+// 2. 帳號 (Account)
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -44,7 +48,7 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
-// 3. 工作階段 (Session) - 判斷使用者有沒有登入
+// 3. 工作階段 (Session)
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -56,51 +60,54 @@ model Session {
 // 4. 書籍 (Book)
 model Book {
   id            String   @id @default(cuid())
-  status        String   @default("ON_SALE")
+  status        String   @default("ON_SALE") // ON_SALE, SOLD
   isbn          String
   title         String
-  authors       String[]
+  
+  // 👇 修改這裡：為了方便搜尋與儲存，我們改成單數且為字串
+  author        String   
+  
   publisher     String?
   publishedDate String?
-  description   String?
+  description   String?  // 備註/詳細說明
   coverUrl      String?
   price         Int
-  originalPrice Int?     // 原價 (設為可選，因為有些老書沒定價)
-  noteStatus    String?  // 筆記狀況 (例如：無劃記、有筆記)
-  condition     String
-  courseName    String?
-  professor     String?
-  tradeMethod   String[]
+  condition     String   // 書況 (幾成新)
+  courseName    String?  // 課程名稱
+  
+  // 👇 這些是你這次新增的欄位 (已正確加入)
+  originalPrice Int?     // 原價
+  noteStatus    String?  // 劃記狀態
+  professor     String?  // 教授姓名
+  
+  tradeMethod   String[] // 面交、寄送... (保留陣列OK)
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sellerId      String   // 這本書是誰賣的
+  sellerId      String
   seller        User     @relation(fields: [sellerId], references: [id])
 }
-// 聊天室 (連結兩個使用者)
+
+// 5. 聊天室 (ChatRoom)
 model ChatRoom {
   id        String    @id @default(cuid())
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt // 用來排序，有新訊息時會更新這個時間
+  updatedAt DateTime  @updatedAt 
   
-  // 聊天室裡的成員 (買家 & 賣家)
   users     User[]    @relation("ChatParticipants")
-  
-  // 聊天室裡的所有訊息
   messages  Message[]
 }
 
-// 訊息 (每一句話)
+// 6. 訊息 (Message)
 model Message {
   id         String   @id @default(cuid())
-  content    String   // 訊息內容
+  content    String
   createdAt  DateTime @default(now())
   
-  // 誰傳的？
   senderId   String
   sender     User     @relation("MessageSender", fields: [senderId], references: [id])
   
-  // 屬於哪個聊天室？
   chatRoomId String
   chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
 }

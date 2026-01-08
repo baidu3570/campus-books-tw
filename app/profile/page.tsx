@@ -86,12 +86,21 @@ export default function ProfilePage() {
     if (!confirm("確定要永久刪除這本書嗎？建議改為「已售出」即可保留紀錄。")) return;
     try {
       const res = await fetch(`/api/books/${bookId}`, { method: "DELETE" });
+      
+      // 👇 讀取後端傳回來的錯誤訊息
+      const data = await res.json(); 
+
       if (res.ok) {
         setMyBooks(prev => prev.filter(book => book.id !== bookId));
-        alert("刪除成功！");
+        alert("🗑️ 刪除成功！");
+      } else {
+        // 👇 如果失敗，把原因彈出來！
+        alert(`刪除失敗：${data.error || "未知錯誤"}`);
+        console.error(data);
       }
     } catch (error) {
-      alert("發生錯誤");
+      alert("連線發生錯誤，請檢查網路或 API");
+      console.error(error);
     }
   };
 
