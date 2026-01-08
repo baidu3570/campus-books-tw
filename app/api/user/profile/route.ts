@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-// 👇 改用這種路徑，保證找得到朋友
-import { authOptions } from "../../auth/[...nextauth]/route";
+// 👇 建議改用 @ 開頭的絕對路徑，比較不會因為檔案搬家而找不到
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"; 
 
 export async function PUT(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    // 👇 檢查 email 是否存在，比較保險
+    if (!session || !session.user?.email) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
@@ -15,7 +16,8 @@ export async function PUT(request: Request) {
     const { university } = body;
 
     const updatedUser = await prisma.user.update({
-      where: { id: (session.user as any).id },
+      // ✅ 改用 email 來找人，這最穩！
+      where: { email: session.user.email },
       data: { university: university || null },
     });
 

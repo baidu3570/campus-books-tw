@@ -114,7 +114,6 @@ export default function BookUploadForm() {
         description: data.description || "",
         coverUrl: data.thumbnail || "",
         // 把 http 換成 https，確保圖片一定能顯示
-        coverUrl: data.thumbnail?.replace("http:", "https:") || "",
       }));
       setMsg("✅ 自動帶入成功！");
     } catch (error) {
