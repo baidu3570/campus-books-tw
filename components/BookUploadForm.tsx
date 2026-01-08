@@ -101,7 +101,8 @@ export default function BookUploadForm() {
     if (!formData.isbn) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/books/lookup?isbn=${formData.isbn}`);
+      // ✅ 改成這樣 (把 books/lookup 換成 check)
+      const res = await fetch(`/api/check?isbn=${formData.isbn}`);
       if (!res.ok) throw new Error("找不到這本書");
       const data = await res.json();
       setFormData(prev => ({
